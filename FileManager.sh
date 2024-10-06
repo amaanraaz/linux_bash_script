@@ -1,6 +1,10 @@
-#!/bin/bash
+#!/usr/bin/sudo bash
 
-#### Part-1 #####
+# sourcing the file which have functions inside it.
+. functions.sh
+
+#### Part-2 #####
+
 
 operation=$1
 location=$2
@@ -8,14 +12,18 @@ filename=$3
 message=$4
 message2=$5
 
+
 # create a directory
 if [ "$operation" == "addDir" ]; then
-	mkdir -p  "$location/$filename"
-	echo "dir create"
+	# mkdir -p  "$location/$filename"
+	# echo "dir create"
+	addDir $location $filename
+
 # Delete a directory
 elif [ "$operation" == "deleteDir" ]; then
-	rmdir "$location/$filename"
-	echo "$filename dir deleted"
+	# rmdir "$location/$filename"
+	# echo "$filename dir deleted"
+	deleteDir $location $filename
 
 # Only list files in a dir
 elif [ "$operation" == "listFiles" ]; then
