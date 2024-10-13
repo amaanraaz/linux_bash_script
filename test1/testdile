@@ -1,5 +1,0 @@
-Port 220
-PasswordAuthentication yes
-
-sudo systemctl status sshd
-sudo systemctl enable sshd
