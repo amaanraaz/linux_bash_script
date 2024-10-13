@@ -1,0 +1,171 @@
+#!/bin/bash
+
+# File to store SSH connections
+CONNECTION_FILE="$HOME/.otssh_connections"
+
+# Function to add a new SSH connection
+add_connection() {
+    local name=$1
+    local host=$2
+    local user=$3
+    local port=$4
+    local key=$5
+
+    # Check if connection already exists
+    if grep -q "^$name:" "$CONNECTION_FILE"; then
+        echo "[ERROR]: Connection with name '$name' already exists."
+        exit 1
+    fi
+
+    # Save connection details
+    echo "$name: $user@$host $port $key" >> "$CONNECTION_FILE"
+    echo "Connection '$name' added successfully."
+}
+
+# Function to list all SSH connections
+list_connections() {
+    if [[ "$1" == "-d" ]]; then
+        while IFS= read -r line; do
+            name=$(echo "$line" | cut -d':' -f1)
+            details=$(echo "$line" | cut -d':' -f2)
+            echo "$name: ssh $details"
+        done < "$CONNECTION_FILE"
+    else
+        cut -d':' -f1 "$CONNECTION_FILE"
+    fi
+}
+
+# Function to update an existing SSH connection
+update_connection() {
+    local name=$1
+    local host=$2
+    local user=$3
+    local port=$4
+    local key=$5
+
+    # Check if connection exists
+    if ! grep -q "^$name:" "$CONNECTION_FILE"; then
+        echo "[ERROR]: Connection with name '$name' does not exist."
+        exit 1
+    fi
+
+    # Update the connection
+    sed -i "/^$name:/d" "$CONNECTION_FILE"
+    echo "$name: $user@$host $port $key" >> "$CONNECTION_FILE"
+    echo "Connection '$name' updated successfully."
+}
+
+# Function to delete a connection
+delete_connection() {
+    local name=$1
+
+    # Check if connection exists
+    if ! grep -q "^$name:" "$CONNECTION_FILE"; then
+        echo "[ERROR]: Connection with name '$name' does not exist."
+        exit 1
+    fi
+
+    # Delete the connection
+    sed -i "/^$name:/d" "$CONNECTION_FILE"
+    echo "Connection '$name' deleted successfully."
+}
+
+# Function to connect to a server
+connect_to_server() {
+    local name=$1
+    local connection=$(grep "^$name:" "$CONNECTION_FILE")
+
+    if [[ -z "$connection" ]]; then
+        echo "[ERROR]: Server information is not available, please add server first."
+        exit 1
+    fi
+
+    user_host=$(echo "$connection" | cut -d' ' -f2)
+    port=$(echo "$connection" | cut -d' ' -f3)
+    key=$(echo "$connection" | cut -d' ' -f4)
+
+    if [[ -n "$key" ]]; then
+        echo "Connecting to $name on $port port as $user_host via $key key"
+        ssh -i "$key" -p "$port" "$user_host"
+    else
+        echo "Connecting to $name on $port port as $user_host"
+        ssh -p "$port" "$user_host"
+    fi
+}
+
+# Main script logic
+case "$1" in
+    -a)  # Add connection
+        name=""
+        host=""
+        user=""
+        port=22  # Default port
+        key=""   # Default key is empty
+        shift
+
+        while getopts ":n:h:u:p:i:" opt; do
+            case $opt in
+                n) name=$OPTARG ;;
+                h) host=$OPTARG ;;
+                u) user=$OPTARG ;;
+                p) port=$OPTARG ;;
+                i) key=$OPTARG ;;
+                *) echo "Invalid option"; exit 1 ;;
+            esac
+        done
+
+        if [[ -z "$name" || -z "$host" || -z "$user" ]]; then
+            echo "Usage: otssh -a -n <name> -h <host> -u <user> [-p <port>] [-i <keyfile>]"
+            exit 1
+        fi
+
+        add_connection "$name" "$host" "$user" "$port" "$key"
+        ;;
+
+    ls)  # List connections
+        list_connections "$2"
+        ;;
+
+    -u)  # Update connection
+        name=""
+        host=""
+        user=""
+        port=22
+        key=""
+        shift
+
+        while getopts ":n:h:u:p:i:" opt; do
+            case $opt in
+                n) name=$OPTARG ;;
+                h) host=$OPTARG ;;
+                u) user=$OPTARG ;;
+                p) port=$OPTARG ;;
+                i) key=$OPTARG ;;
+                *) echo "Invalid option"; exit 1 ;;
+            esac
+        done
+
+        if [[ -z "$name" || -z "$host" || -z "$user" ]]; then
+            echo "Usage: otssh -u -n <name> -h <host> -u <user> [-p <port>] [-i <keyfile>]"
+            exit 1
+        fi
+
+        update_connection "$name" "$host" "$user" "$port" "$key"
+        ;;
+
+    rm)  # Remove connection
+        if [[ -z "$2" ]]; then
+            echo "Usage: otssh rm <name>"
+            exit 1
+        fi
+        delete_connection "$2"
+        ;;
+
+    *)  # Connect to server
+        if [[ -z "$1" ]]; then
+            echo "Usage: otssh <server_name>"
+            exit 1
+        fi
+        connect_to_server "$1"
+        ;;
+esac
